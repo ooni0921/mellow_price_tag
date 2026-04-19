@@ -28,40 +28,37 @@ def create_tag_image(row):
     draw = ImageDraw.Draw(img)
     margin_left, max_text_w = 45, 410
 
-    # 1. 텍스트 배치 (한글, 영어, 중어, 일어)
-    draw_text_with_scaling(draw, row['한글상품명'], (margin_left, 45), FONT_PATH, 48, max_text_w)
-    draw_text_with_scaling(draw, row['영어명'], (margin_left, 105), FONT_PATH, 32, max_text_w)
-    draw_text_with_scaling(draw, row['중국어 설명'], (margin_left, 165), FONT_PATH, 28, max_text_w)
-    draw_text_with_scaling(draw, row['일본어 설명'], (margin_left, 205), FONT_PATH, 28, max_text_w)
+    # 1. 한글 상품명 (기존 블랙 유지)
+    draw_text_with_scaling(draw, row['한글상품명'], (margin_left, 45), FONT_PATH, 48, max_text_w, fill=(0, 0, 0))
     
-    # 2. 가격 (빨간색)
+    # 2. 외국어 설명 (빨간색 변경: 255, 0, 0)
+    draw_text_with_scaling(draw, row['영어명'], (margin_left, 105), FONT_PATH, 32, max_text_w, fill=(255, 0, 0))
+    draw_text_with_scaling(draw, row['중국어 설명'], (margin_left, 165), FONT_PATH, 28, max_text_w, fill=(255, 0, 0))
+    draw_text_with_scaling(draw, row['일본어 설명'], (margin_left, 205), FONT_PATH, 28, max_text_w, fill=(255, 0, 0))
+    
+    # 3. 가격 (그레이색 변경: 128, 128, 128)
     price_val = str(row['가격']).replace(',', '')
     if price_val.isdigit(): price_val = format(int(price_val), ',')
-    draw.text((margin_left, 310), f"₩{price_val}", font=ImageFont.truetype(FONT_PATH, 65), fill=(255, 0, 0))
+    draw.text((margin_left, 310), f"₩{price_val}", font=ImageFont.truetype(FONT_PATH, 65), fill=(128, 128, 128))
     
-    # 3. QR 코드 조건부 생성 (ID가 있을 때만)
+    # 4. QR 코드 조건부 생성
     qr_id = str(row['QR코드id값']).strip() if pd.notnull(row['QR코드id값']) else ""
-    
     if qr_id and qr_id.lower() != "nan" and qr_id != "":
         qr = qrcode.QRCode(box_size=6, border=1)
         qr.add_data(f"{BASE_URL}{qr_id}")
         qr.make(fit=True)
         qr_img = qr.make_image().convert('RGB').resize((180, 180))
         img.paste(qr_img, (470, 110))
-        
         detail_font = ImageFont.truetype(FONT_PATH, 18)
         draw.text((490, 300), "상품 상세 정보", font=detail_font, fill=(34, 139, 34))
 
-    # 4. 파일 저장 (ID가 없으면 상품명으로 파일명 생성)
     if not os.path.exists(TAG_DIR): os.makedirs(TAG_DIR)
-    file_name = qr_id if qr_id else str(row['한글상품명']).replace(" ", "_")
-    path = f"{TAG_DIR}/{file_path_clean(file_name)}.png"
+    # 파일명 결정
+    clean_name = "".join([c for c in str(row['한글상품명']) if c.isalnum() or c in (' ', '_')]).strip().replace(" ", "_")
+    file_id = qr_id if qr_id else clean_name
+    path = f"{TAG_DIR}/{file_id}.png"
     img.save(path)
     return path
-
-def file_path_clean(name):
-    """파일명에 사용할 수 없는 문자 제거"""
-    return "".join([c for c in name if c.isalnum() or c in (' ', '_')]).strip()
 
 def generate_pdf(image_paths):
     pages, cols, rows = [], 3, 7
@@ -87,19 +84,15 @@ class MellowApp:
         self.root = root
         self.root.title("mellow PHARMACY - 가격표 통합 매니저")
         self.root.geometry("1150x850")
-        
         self.load_data()
 
-        main_frame = tk.Frame(root)
-        main_frame.pack(pady=10, fill="both", expand=True, padx=20)
-
+        main_frame = tk.Frame(root); main_frame.pack(pady=10, fill="both", expand=True, padx=20)
         search_f = tk.Frame(main_frame); search_f.pack(fill="x", pady=5)
         tk.Label(search_f, text="상품 검색:").pack(side="left")
         self.search_var = tk.StringVar(); self.search_var.trace_add("write", self.update_search_list)
         tk.Entry(search_f, textvariable=self.search_var, width=30).pack(side="left", padx=5)
 
         list_c = tk.Frame(main_frame); list_c.pack(fill="both", expand=True, pady=10)
-
         l_f = tk.Frame(list_c); l_f.pack(side="left", fill="both", expand=True)
         self.tree_source = ttk.Treeview(l_f, columns=("ID", "Name", "Price"), show='headings')
         self.tree_source.heading("ID", text="ID"); self.tree_source.heading("Name", text="상품명"); self.tree_source.heading("Price", text="가격")
@@ -119,7 +112,6 @@ class MellowApp:
         self.tree_print.bind("<<TreeviewSelect>>", lambda e: self.on_item_select(self.tree_print))
 
         bottom_frame = tk.Frame(root); bottom_frame.pack(fill="x", padx=20, pady=10)
-
         edit_f = tk.LabelFrame(bottom_frame, text=" 가격 수정 ", padx=10, pady=10)
         edit_f.pack(side="left", fill="both", expand=True, padx=5)
         self.sel_id = None; self.sel_name_var = tk.StringVar(value="상품을 선택하세요")
@@ -169,10 +161,7 @@ class MellowApp:
     def register_product(self):
         data = {k: v.get().strip() for k, v in self.reg_vars.items()}
         if not data['한글상품명'] or not data['가격']: return messagebox.showwarning("경고", "상품명과 가격은 필수입니다.")
-        # ID 중복 체크 (공란이 아닐 때만)
-        if data['QR코드id값'] != "" and data['QR코드id값'] in self.df['QR코드id값'].astype(str).values:
-            return messagebox.showerror("에러", "ID 중복!")
-        
+        if data['QR코드id값'] != "" and data['QR코드id값'] in self.df['QR코드id값'].astype(str).values: return messagebox.showerror("에러", "ID 중복!")
         self.df = pd.concat([self.df, pd.DataFrame([data])], ignore_index=True)
         self.df.to_csv(INPUT_CSV, index=False, encoding='utf-8-sig')
         messagebox.showinfo("성공", "등록 완료"); self.update_search_list()
@@ -180,12 +169,8 @@ class MellowApp:
     def update_price(self):
         new_p = self.new_p_var.get().strip()
         if not new_p.isdigit(): return
-        # ID가 없는 경우 상품명으로 매칭하여 수정
-        if self.sel_id == "":
-            idx = self.df[(self.df['한글상품명'] == self.sel_name_var.get()) & (self.df['QR코드id값'] == "")].index
-        else:
-            idx = self.df[self.df['QR코드id값'] == self.sel_id].index
-        
+        if self.sel_id == "": idx = self.df[(self.df['한글상품명'] == self.sel_name_var.get()) & (self.df['QR코드id값'] == "")].index
+        else: idx = self.df[self.df['QR코드id값'] == self.sel_id].index
         if len(idx) > 0:
             self.df.loc[idx, '가격'] = int(new_p)
             self.df.to_csv(INPUT_CSV, index=False, encoding='utf-8-sig')
