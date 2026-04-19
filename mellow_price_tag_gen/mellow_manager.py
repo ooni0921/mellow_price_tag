@@ -79,19 +79,13 @@ class MellowApp:
         main_frame = tk.Frame(root)
         main_frame.pack(pady=10, fill="both", expand=True, padx=20)
 
-        # 검색바
-        search_f = tk.Frame(main_frame)
-        search_f.pack(fill="x", pady=5)
+        search_f = tk.Frame(main_frame); search_f.pack(fill="x", pady=5)
         tk.Label(search_f, text="상품 검색:").pack(side="left")
-        self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", self.update_search_list)
+        self.search_var = tk.StringVar(); self.search_var.trace_add("write", self.update_search_list)
         tk.Entry(search_f, textvariable=self.search_var, width=30).pack(side="left", padx=5)
 
-        # 듀얼 리스트 컨테이너
-        list_c = tk.Frame(main_frame)
-        list_c.pack(fill="both", expand=True, pady=10)
+        list_c = tk.Frame(main_frame); list_c.pack(fill="both", expand=True, pady=10)
 
-        # 왼쪽: 전체 목록
         l_f = tk.Frame(list_c); l_f.pack(side="left", fill="both", expand=True)
         tk.Label(l_f, text="전체 상품", font=("", 9, "bold")).pack()
         self.tree_source = ttk.Treeview(l_f, columns=("ID", "Name", "Price"), show='headings')
@@ -100,12 +94,10 @@ class MellowApp:
         self.tree_source.pack(fill="both", expand=True)
         self.tree_source.bind("<<TreeviewSelect>>", lambda e: self.on_item_select(self.tree_source))
 
-        # 중간: 버튼
         m_f = tk.Frame(list_c); m_f.pack(side="left", padx=10)
         tk.Button(m_f, text="추가 ▶", command=self.add_to_print_list, width=8).pack(pady=5)
         tk.Button(m_f, text="◀ 제거", command=self.remove_from_print_list, width=8).pack(pady=5)
 
-        # 오른쪽: 출력 대기
         r_f = tk.Frame(list_c); r_f.pack(side="left", fill="both", expand=True)
         tk.Label(r_f, text="출력 대기", font=("", 9, "bold")).pack()
         self.tree_print = ttk.Treeview(r_f, columns=("ID", "Name", "Price"), show='headings')
@@ -114,43 +106,28 @@ class MellowApp:
         self.tree_print.pack(fill="both", expand=True)
         self.tree_print.bind("<<TreeviewSelect>>", lambda e: self.on_item_select(self.tree_print))
 
-        # [2. 하단 편집 및 신규 등록 영역]
-        bottom_frame = tk.Frame(root)
-        bottom_frame.pack(fill="x", padx=20, pady=10)
+        # [2. 하단 영역]
+        bottom_frame = tk.Frame(root); bottom_frame.pack(fill="x", padx=20, pady=10)
 
-        # 가격 수정 섹션
         edit_f = tk.LabelFrame(bottom_frame, text=" 가격 수정 ", padx=10, pady=10)
         edit_f.pack(side="left", fill="both", expand=True, padx=5)
-        self.sel_id = None
-        self.sel_name_var = tk.StringVar(value="상품을 선택하세요")
+        self.sel_id = None; self.sel_name_var = tk.StringVar(value="상품을 선택하세요")
         tk.Label(edit_f, textvariable=self.sel_name_var, fg="blue", wraplength=150).pack()
-        self.new_p_var = tk.StringVar()
-        tk.Entry(edit_f, textvariable=self.new_p_var, width=15).pack(pady=5)
+        self.new_p_var = tk.StringVar(); tk.Entry(edit_f, textvariable=self.new_p_var, width=15).pack(pady=5)
         tk.Button(edit_f, text="수정 저장", command=self.update_price, bg="#f0ad4e").pack()
 
-        # 신규 상품 등록 섹션
         reg_f = tk.LabelFrame(bottom_frame, text=" 신규 상품 등록 ", padx=10, pady=10)
         reg_f.pack(side="left", fill="both", expand=True, padx=5)
-        
-        # 입력 필드들
-        self.reg_vars = {
-            '한글상품명': tk.StringVar(), '영어명': tk.StringVar(),
-            '중국어 설명': tk.StringVar(), '일본어 설명': tk.StringVar(),
-            '가격': tk.StringVar(), 'QR코드id값': tk.StringVar()
-        }
-        
+        self.reg_vars = {k: tk.StringVar() for k in ['한글상품명','영어명','중국어 설명','일본어 설명','가격','QR코드id값']}
         for i, (label, var) in enumerate(self.reg_vars.items()):
             tk.Label(reg_f, text=label).grid(row=i//2, column=(i%2)*2, sticky="w")
             tk.Entry(reg_f, textvariable=var, width=15).grid(row=i//2, column=(i%2)*2+1, padx=5, pady=2)
-        
         tk.Button(reg_f, text="신규 등록 완료", command=self.register_product, bg="#5bc0de").grid(row=3, column=0, columnspan=4, pady=10)
 
-        # 실행 버튼
-        act_f = tk.Frame(bottom_frame)
-        act_f.pack(side="right", padx=10)
+        act_f = tk.Frame(bottom_frame); act_f.pack(side="right", padx=10)
         self.stat_var = tk.StringVar(value="인쇄 대기: 0개")
         tk.Label(act_f, textvariable=self.stat_var).pack()
-        tk.Button(act_f, text="PDF 생성 실행", command=self.run_pdf, bg="#228B22", fg="white", font=("", 11, "bold"), width=20, height=2).pack(pady=5)
+        tk.Button(act_f, text="PDF 생성 및 열기", command=self.run_pdf, bg="#228B22", fg="white", font=("", 11, "bold"), width=20, height=2).pack(pady=5)
 
         self.update_search_list()
 
@@ -159,8 +136,7 @@ class MellowApp:
             if not os.path.exists(INPUT_CSV):
                 pd.DataFrame(columns=['한글상품명','영어명','중국어 설명','일본어 설명','가격','QR코드id값']).to_csv(INPUT_CSV, index=False, encoding='utf-8-sig')
             self.df = pd.read_csv(INPUT_CSV, encoding='utf-8-sig')
-        except Exception as e:
-            messagebox.showerror("오류", f"데이터 로드 실패: {e}")
+        except Exception as e: messagebox.showerror("오류", f"데이터 로드 실패: {e}")
 
     def update_search_list(self, *args):
         query = self.search_var.get().strip()
@@ -173,33 +149,16 @@ class MellowApp:
     def on_item_select(self, tree):
         sel = tree.selection()
         if not sel: return
-        item = tree.item(sel[0])
-        self.sel_id = item['values'][0]
-        self.sel_name_var.set(item['values'][1])
-        self.new_p_var.set(str(item['values'][2]).replace(',',''))
+        item = tree.item(sel[0]); self.sel_id = item['values'][0]
+        self.sel_name_var.set(item['values'][1]); self.new_p_var.set(str(item['values'][2]).replace(',',''))
 
     def register_product(self):
-        # 1. 빈 칸 확인
         data = {k: v.get().strip() for k, v in self.reg_vars.items()}
-        if not all(data.values()):
-            messagebox.showwarning("경고", "모든 항목을 입력해 주세요.")
-            return
-        
-        # 2. ID 중복 확인
-        if data['QR코드id값'] in self.df['QR코드id값'].astype(str).values:
-            messagebox.showerror("에러", f"ID '{data['QR코드id값']}'은 이미 존재합니다.")
-            return
-
-        # 3. 데이터 추가 및 저장
-        new_row = pd.DataFrame([data])
-        self.df = pd.concat([self.df, new_row], ignore_index=True)
-        try:
-            self.df.to_csv(INPUT_CSV, index=False, encoding='utf-8-sig')
-            messagebox.showinfo("성공", f"'{data['한글상품명']}'이 등록되었습니다.")
-            for v in self.reg_vars.values(): v.set("") # 입력창 초기화
-            self.update_search_list()
-        except Exception as e:
-            messagebox.showerror("에러", f"저장 실패: {e}")
+        if not all(data.values()): return messagebox.showwarning("경고", "모든 항목을 입력하세요.")
+        if data['QR코드id값'] in self.df['QR코드id값'].astype(str).values: return messagebox.showerror("에러", "ID 중복!")
+        self.df = pd.concat([self.df, pd.DataFrame([data])], ignore_index=True)
+        self.df.to_csv(INPUT_CSV, index=False, encoding='utf-8-sig')
+        messagebox.showinfo("성공", "등록 완료"); self.update_search_list()
 
     def update_price(self):
         if not self.sel_id: return
@@ -207,12 +166,10 @@ class MellowApp:
         if not new_p.isdigit(): return
         self.df.loc[self.df['QR코드id값'] == self.sel_id, '가격'] = int(new_p)
         self.df.to_csv(INPUT_CSV, index=False, encoding='utf-8-sig')
-        messagebox.showinfo("알림", "가격이 수정되었습니다.")
-        self.update_search_list()
+        messagebox.showinfo("알림", "가격 수정 완료"); self.update_search_list()
 
     def add_to_print_list(self):
-        for s in self.tree_source.selection():
-            self.tree_print.insert("", "end", values=self.tree_source.item(s)['values'])
+        for s in self.tree_source.selection(): self.tree_print.insert("", "end", values=self.tree_source.item(s)['values'])
         self.stat_var.set(f"인쇄 대기: {len(self.tree_print.get_children())}개")
 
     def remove_from_print_list(self):
@@ -221,15 +178,19 @@ class MellowApp:
 
     def run_pdf(self):
         items = self.tree_print.get_children()
-        if not items: return
+        if not items: return messagebox.showwarning("알림", "출력할 상품이 없습니다.")
         paths = []
         for i in items:
             row = self.df[self.df['QR코드id값'] == self.tree_print.item(i)['values'][0]].iloc[0]
             paths.append(create_tag_image(row))
+        
         generate_pdf(paths)
-        messagebox.showinfo("완료", "PDF 생성이 완료되었습니다.")
+        
+        # PDF 파일 바로 열기 (윈도우 환경)
+        try:
+            os.startfile(FINAL_PDF)
+        except Exception as e:
+            messagebox.showerror("오류", f"파일을 열 수 없습니다: {e}")
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = MellowApp(root)
-    root.mainloop()
+    root = tk.Tk(); app = MellowApp(root); root.mainloop()
