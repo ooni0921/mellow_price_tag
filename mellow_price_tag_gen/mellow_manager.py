@@ -27,26 +27,41 @@ def create_tag_image(row):
     img = Image.new("RGB", (WIDTH, HEIGHT), (255, 255, 255))
     draw = ImageDraw.Draw(img)
     margin_left, max_text_w = 45, 410
-    draw_text_with_scaling(draw, row['한글상품명'], (margin_left, 50), FONT_PATH, 48, max_text_w)
-    draw_text_with_scaling(draw, row['영어명'], (margin_left, 110), FONT_PATH, 26, max_text_w, fill=(80, 80, 80))
-    draw_text_with_scaling(draw, row['중국어 설명'], (margin_left, 160), FONT_PATH, 22, max_text_w, fill=(120, 120, 120))
-    draw_text_with_scaling(draw, row['일본어 설명'], (margin_left, 195), FONT_PATH, 22, max_text_w, fill=(120, 120, 120))
+
+    # 1. 텍스트 배치 (한글, 영어, 중어, 일어)
+    draw_text_with_scaling(draw, row['한글상품명'], (margin_left, 45), FONT_PATH, 48, max_text_w)
+    draw_text_with_scaling(draw, row['영어명'], (margin_left, 105), FONT_PATH, 32, max_text_w)
+    draw_text_with_scaling(draw, row['중국어 설명'], (margin_left, 165), FONT_PATH, 28, max_text_w)
+    draw_text_with_scaling(draw, row['일본어 설명'], (margin_left, 205), FONT_PATH, 28, max_text_w)
     
+    # 2. 가격 (빨간색)
     price_val = str(row['가격']).replace(',', '')
     if price_val.isdigit(): price_val = format(int(price_val), ',')
-    draw.text((margin_left, 310), f"₩{price_val}", font=ImageFont.truetype(FONT_PATH, 65), fill=(0, 0, 0))
+    draw.text((margin_left, 310), f"₩{price_val}", font=ImageFont.truetype(FONT_PATH, 65), fill=(255, 0, 0))
     
-    qr = qrcode.QRCode(box_size=6, border=1)
-    qr.add_data(f"{BASE_URL}{row['QR코드id값']}")
-    qr.make(fit=True)
-    qr_img = qr.make_image().convert('RGB').resize((180, 180))
-    img.paste(qr_img, (470, 110))
-    draw.text((490, 300), "상품 상세 정보", font=ImageFont.truetype(FONT_PATH, 18), fill=(34, 139, 34))
+    # 3. QR 코드 조건부 생성 (ID가 있을 때만)
+    qr_id = str(row['QR코드id값']).strip() if pd.notnull(row['QR코드id값']) else ""
+    
+    if qr_id and qr_id.lower() != "nan" and qr_id != "":
+        qr = qrcode.QRCode(box_size=6, border=1)
+        qr.add_data(f"{BASE_URL}{qr_id}")
+        qr.make(fit=True)
+        qr_img = qr.make_image().convert('RGB').resize((180, 180))
+        img.paste(qr_img, (470, 110))
+        
+        detail_font = ImageFont.truetype(FONT_PATH, 18)
+        draw.text((490, 300), "상품 상세 정보", font=detail_font, fill=(34, 139, 34))
 
+    # 4. 파일 저장 (ID가 없으면 상품명으로 파일명 생성)
     if not os.path.exists(TAG_DIR): os.makedirs(TAG_DIR)
-    path = f"{TAG_DIR}/{row['QR코드id값']}.png"
+    file_name = qr_id if qr_id else str(row['한글상품명']).replace(" ", "_")
+    path = f"{TAG_DIR}/{file_path_clean(file_name)}.png"
     img.save(path)
     return path
+
+def file_path_clean(name):
+    """파일명에 사용할 수 없는 문자 제거"""
+    return "".join([c for c in name if c.isalnum() or c in (' ', '_')]).strip()
 
 def generate_pdf(image_paths):
     pages, cols, rows = [], 3, 7
@@ -70,12 +85,11 @@ def generate_pdf(image_paths):
 class MellowApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("mellow PHARMACY - 통합 관리 도구")
+        self.root.title("mellow PHARMACY - 가격표 통합 매니저")
         self.root.geometry("1150x850")
         
         self.load_data()
 
-        # [1. 검색 및 리스트 영역]
         main_frame = tk.Frame(root)
         main_frame.pack(pady=10, fill="both", expand=True, padx=20)
 
@@ -87,7 +101,6 @@ class MellowApp:
         list_c = tk.Frame(main_frame); list_c.pack(fill="both", expand=True, pady=10)
 
         l_f = tk.Frame(list_c); l_f.pack(side="left", fill="both", expand=True)
-        tk.Label(l_f, text="전체 상품", font=("", 9, "bold")).pack()
         self.tree_source = ttk.Treeview(l_f, columns=("ID", "Name", "Price"), show='headings')
         self.tree_source.heading("ID", text="ID"); self.tree_source.heading("Name", text="상품명"); self.tree_source.heading("Price", text="가격")
         self.tree_source.column("ID", width=70); self.tree_source.column("Name", width=180); self.tree_source.column("Price", width=80)
@@ -99,14 +112,12 @@ class MellowApp:
         tk.Button(m_f, text="◀ 제거", command=self.remove_from_print_list, width=8).pack(pady=5)
 
         r_f = tk.Frame(list_c); r_f.pack(side="left", fill="both", expand=True)
-        tk.Label(r_f, text="출력 대기", font=("", 9, "bold")).pack()
         self.tree_print = ttk.Treeview(r_f, columns=("ID", "Name", "Price"), show='headings')
         self.tree_print.heading("ID", text="ID"); self.tree_print.heading("Name", text="상품명"); self.tree_print.heading("Price", text="가격")
         self.tree_print.column("ID", width=70); self.tree_print.column("Name", width=180); self.tree_print.column("Price", width=80)
         self.tree_print.pack(fill="both", expand=True)
         self.tree_print.bind("<<TreeviewSelect>>", lambda e: self.on_item_select(self.tree_print))
 
-        # [2. 하단 영역]
         bottom_frame = tk.Frame(root); bottom_frame.pack(fill="x", padx=20, pady=10)
 
         edit_f = tk.LabelFrame(bottom_frame, text=" 가격 수정 ", padx=10, pady=10)
@@ -136,6 +147,7 @@ class MellowApp:
             if not os.path.exists(INPUT_CSV):
                 pd.DataFrame(columns=['한글상품명','영어명','중국어 설명','일본어 설명','가격','QR코드id값']).to_csv(INPUT_CSV, index=False, encoding='utf-8-sig')
             self.df = pd.read_csv(INPUT_CSV, encoding='utf-8-sig')
+            self.df['QR코드id값'] = self.df['QR코드id값'].fillna('')
         except Exception as e: messagebox.showerror("오류", f"데이터 로드 실패: {e}")
 
     def update_search_list(self, *args):
@@ -144,29 +156,40 @@ class MellowApp:
         if 0 < len(query) < 2: return
         f_df = self.df if len(query) < 2 else self.df[self.df['한글상품명'].str.contains(query, case=False, na=False)]
         for _, r in f_df.iterrows():
-            self.tree_source.insert("", "end", values=(r['QR코드id값'], r['한글상품명'], format(int(str(r['가격']).replace(',','')), ',')))
+            id_disp = r['QR코드id값'] if r['QR코드id값'] != "" else "(없음)"
+            self.tree_source.insert("", "end", values=(id_disp, r['한글상품명'], format(int(str(r['가격']).replace(',','')), ',')))
 
     def on_item_select(self, tree):
         sel = tree.selection()
         if not sel: return
         item = tree.item(sel[0]); self.sel_id = item['values'][0]
+        if self.sel_id == "(없음)": self.sel_id = ""
         self.sel_name_var.set(item['values'][1]); self.new_p_var.set(str(item['values'][2]).replace(',',''))
 
     def register_product(self):
         data = {k: v.get().strip() for k, v in self.reg_vars.items()}
-        if not all(data.values()): return messagebox.showwarning("경고", "모든 항목을 입력하세요.")
-        if data['QR코드id값'] in self.df['QR코드id값'].astype(str).values: return messagebox.showerror("에러", "ID 중복!")
+        if not data['한글상품명'] or not data['가격']: return messagebox.showwarning("경고", "상품명과 가격은 필수입니다.")
+        # ID 중복 체크 (공란이 아닐 때만)
+        if data['QR코드id값'] != "" and data['QR코드id값'] in self.df['QR코드id값'].astype(str).values:
+            return messagebox.showerror("에러", "ID 중복!")
+        
         self.df = pd.concat([self.df, pd.DataFrame([data])], ignore_index=True)
         self.df.to_csv(INPUT_CSV, index=False, encoding='utf-8-sig')
         messagebox.showinfo("성공", "등록 완료"); self.update_search_list()
 
     def update_price(self):
-        if not self.sel_id: return
         new_p = self.new_p_var.get().strip()
         if not new_p.isdigit(): return
-        self.df.loc[self.df['QR코드id값'] == self.sel_id, '가격'] = int(new_p)
-        self.df.to_csv(INPUT_CSV, index=False, encoding='utf-8-sig')
-        messagebox.showinfo("알림", "가격 수정 완료"); self.update_search_list()
+        # ID가 없는 경우 상품명으로 매칭하여 수정
+        if self.sel_id == "":
+            idx = self.df[(self.df['한글상품명'] == self.sel_name_var.get()) & (self.df['QR코드id값'] == "")].index
+        else:
+            idx = self.df[self.df['QR코드id값'] == self.sel_id].index
+        
+        if len(idx) > 0:
+            self.df.loc[idx, '가격'] = int(new_p)
+            self.df.to_csv(INPUT_CSV, index=False, encoding='utf-8-sig')
+            messagebox.showinfo("알림", "가격 수정 완료"); self.update_search_list()
 
     def add_to_print_list(self):
         for s in self.tree_source.selection(): self.tree_print.insert("", "end", values=self.tree_source.item(s)['values'])
@@ -181,16 +204,14 @@ class MellowApp:
         if not items: return messagebox.showwarning("알림", "출력할 상품이 없습니다.")
         paths = []
         for i in items:
-            row = self.df[self.df['QR코드id값'] == self.tree_print.item(i)['values'][0]].iloc[0]
+            vals = self.tree_print.item(i)['values']
+            cur_id = vals[0] if vals[0] != "(없음)" else ""
+            cur_name = vals[1]
+            row = self.df[(self.df['한글상품명'] == cur_name) & (self.df['QR코드id값'] == cur_id)].iloc[0]
             paths.append(create_tag_image(row))
-        
         generate_pdf(paths)
-        
-        # PDF 파일 바로 열기 (윈도우 환경)
-        try:
-            os.startfile(FINAL_PDF)
-        except Exception as e:
-            messagebox.showerror("오류", f"파일을 열 수 없습니다: {e}")
+        try: os.startfile(FINAL_PDF)
+        except Exception as e: messagebox.showerror("오류", f"파일 열기 실패: {e}")
 
 if __name__ == "__main__":
     root = tk.Tk(); app = MellowApp(root); root.mainloop()
