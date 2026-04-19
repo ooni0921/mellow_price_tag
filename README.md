@@ -2,4 +2,4 @@ pip install pandas qrcode[pil] pillow
 
 
 
-pip install pandas google-generativeai
+pip install -U google-genai pandas
